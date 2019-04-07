@@ -41,9 +41,6 @@ class Process:
 	def addStream(self, stream):
 		self.streams.append(stream)
 
-	def __repr__(self):
-		return str(self.__dict__)
-
 def reformatIP(IP):
 	k = IP.rfind(".")
 	result = IP[:k] + ':' + IP[k+1:]
@@ -85,31 +82,18 @@ def plotAllProcesses(processHistory):
 		for name, process in processDict.items():
 			if not name in processes:
 				processes[name] = []
-			up = 0
-			down = 0
-			for stream in process.streams:
-				if stream.direction == 'up':
-					up += stream.size
-				else:
-					down += stream.size
 			processes[name].append({
 				'time': time,
-				'up': up,
-				'down': down
+				'up': next((stream.size for stream in process.streams if stream.direction == 'up'), 0),
+				'down': next((stream.size for stream in process.streams if stream.direction == 'down'), 0)
 			})
-		for processName in processes:
-			if not processName in processDict.keys():
-				processes[processName].append({
-					'time': time,
-					'up': 0,
-					'down': 0
-				})
 	# print(processes)
 	plt.xlabel('time (s)')
 	plt.ylabel('bitstream (Mbps)')
 	plt.grid(True)
 	legend = []
 	for process in processes.items():
+		print(process[0])
 		legend.append(process[0])
 		x = list(history['time'] for history in process[1])
 		y = list((history['down'] * 8) / 10000000 for history in process[1])
@@ -122,6 +106,7 @@ def plotAllProcesses(processHistory):
 	plt.ylabel('bitstream (kbps)')
 	legend = []
 	for process in processes.items():
+		print(process[0])
 		legend.append(process[0])
 		x = list(history['time'] for history in process[1])
 		y = list((history['up'] * 8) / 10000 for history in process[1])
@@ -130,15 +115,14 @@ def plotAllProcesses(processHistory):
 	plt.savefig('plot1_up.png')
 	plt.close()
 
-i = 0
-ending = "000"
+i = 1
 streamHistory = {}
 processHistory = {}
 
-while os.path.exists("netstat"+ending) and os.path.exists("tcpdump"+ending):
-    netstat = open("netstat"+ending, "r")
-    tcpdump = open("tcpdump"+ending, "r")
-    streams = open("streams"+ending, "w+")
+while os.path.exists("netstat%s" % i) and os.path.exists("tcpdump%s" % i):
+    netstat = open("netstat%s" % i, "r")
+    tcpdump = open("tcpdump%s" % i, "r")
+    streams = open("streams%s" % i, "w+")
     streamDict = {}
     proto = ""
     length = 0
@@ -178,13 +162,11 @@ while os.path.exists("netstat"+ending) and os.path.exists("tcpdump"+ending):
     	except:
     		try:
     			port = localIP.split(':')[1]
-    			index = [ k for k, word in enumerate(netstatContents) if word.endswith(port) ]
+    			index = [ i for i, word in enumerate(netstatContents) if word.endswith(port) ]
     			process = netstatContents[index[0] + 3]
     		except Exception as e:
     			print(2, i, j, e)
     			continue
-    	if len(process) < 4:
-    		continue
     	if process in processDict:
     		processDict[process].addStream(stream)
     	else:
@@ -196,8 +178,7 @@ while os.path.exists("netstat"+ending) and os.path.exists("tcpdump"+ending):
     processHistory[i*10] = processDict
     netstat.close()
     tcpdump.close()
-    i += 1
-    ending = str(i).rjust(3, '0')
+    i+=1
 
 plotHighestHistory(streamHistory)
 plotAllProcesses(processHistory)
